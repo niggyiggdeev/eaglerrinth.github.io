@@ -1,93 +1,140 @@
 document.addEventListener("DOMContentLoaded", function () {
+
     fetch('./mods.json')
         .then(response => response.json())
         .then(data => {
+
             const modContainer = document.getElementById('modContainer');
             const categorySelect = document.getElementById('categorySelect');
             const apiSelect = document.getElementById('apiSelect');
             const searchInput = document.getElementById('searchInput');
 
+            const mods = data.mods;
+
             function createCard(mod) {
                 const card = document.createElement('div');
-                card.className = 'col-md-4 col-lg-4 col-xl-3 mb-4'; 
-                card.innerHTML = `
-                    <div class="card h-100">
-                        <div class="card-body p-4">
-                            <div class="d-flex align-items-center">
-                                <img src="${mod.icon}" class="mod-icon me-3" alt="${mod['display-name']} Icon">
-                                <div>
-                                    <h5 class="card-title m-0">${mod['display-name']}</h5>
-                                    <p class="card-subtitle m-0 mb-2">API: ${mod['api']}</p>
+                card.className = 'col-sm-6 col-md-6 col-lg-4 col-xl-3';
 
-                                    <p class="card-subtitle mb-2 author-text">Author: <a href="user/?user=${mod.author}" class="link-light">${mod.author}</a></p>
+                card.innerHTML = `
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-start">
+                                <img src="${mod.icon}" 
+                                     class="mod-icon me-3 rounded" 
+                                     alt="${mod['display-name']} Icon"
+                                     style="width:48px;height:48px;object-fit:cover;">
+                                <div>
+                                    <h6 class="card-title m-0">${mod['display-name']}</h6>
+                                    <small class="text-muted">API: ${mod.api}</small>
+                                    <br>
+                                    <small class="author-text">
+                                        Author: 
+                                        <a href="user/?user=${mod.author}" class="link-light">
+                                            ${mod.author}
+                                        </a>
+                                    </small>
                                 </div>
                             </div>
-                            <p class="card-text mt-3">${mod.description}</p>
+
+                            <p class="card-text mt-3 small">
+                                ${mod.description}
+                            </p>
                         </div>
-                        <div class="card-footer">
-                            <a href="${mod['repo-link']}" class="btn btn-primary btn-sm" target="_blank">View Source</a>
-                            <a href="${mod['download-link']}" class="btn btn-success btn-sm" download target="_blank">Download</a>
+
+                        <div class="card-footer d-flex justify-content-between">
+                            <a href="${mod['repo-link']}" 
+                               class="btn btn-outline-light btn-sm" 
+                               target="_blank">
+                               Source
+                            </a>
+
+                            <a href="${mod['download-link']}" 
+                               class="btn btn-success btn-sm" 
+                               download 
+                               target="_blank">
+                               Download
+                            </a>
                         </div>
-                    </div>`;
+                    </div>
+                `;
+
                 return card;
             }
 
-            const uniqueCategories = [...new Set(data.mods.map(mod => mod.category))];
-            uniqueCategories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category;
-                option.textContent = category;
-                categorySelect.appendChild(option);
-            });
+            function populateSelect(selectElement, values) {
+                const uniqueValues = [...new Set(values)].sort();
 
-            const uniqueApis = [...new Set(data.mods.map(mod => mod.api))];
-            uniqueApis.forEach(api => {
-                const option = document.createElement('option');
-                option.value = api;
-                option.textContent = api;
-                apiSelect.appendChild(option);
-            });
-
-            function renderMods(mods) {
-                modContainer.innerHTML = '';
-                mods.forEach(mod => {
-                    const card = createCard(mod);
-                    modContainer.appendChild(card);
+                uniqueValues.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    selectElement.appendChild(option);
                 });
             }
 
-            renderMods(data.mods);
+            populateSelect(categorySelect, mods.map(m => m.category));
+            populateSelect(apiSelect, mods.map(m => m.api));
 
-            searchInput.addEventListener('input', () => {
-                filterMods();
-            });
+            function renderMods(modList) {
+                modContainer.innerHTML = '';
 
-            categorySelect.addEventListener('change', () => {
-                filterMods();
-            });
+                if (modList.length === 0) {
+                    modContainer.innerHTML = `
+                        <div class="col-12 text-center mt-5">
+                            <p class="text-muted">No mods found.</p>
+                        </div>
+                    `;
+                    return;
+                }
 
-            apiSelect.addEventListener('change', () => {
-                filterMods();
-            });
+                modList.forEach(mod => {
+                    modContainer.appendChild(createCard(mod));
+                });
+            }
 
             function filterMods() {
-                const searchValue = searchInput.value.toLowerCase();
+                const searchValue = searchInput.value.trim().toLowerCase();
                 const selectedCategory = categorySelect.value;
                 const selectedApi = apiSelect.value;
 
-                const filteredMods = data.mods.filter(mod => {
-                    const matchesSearch = mod['display-name'].toLowerCase().includes(searchValue) ||
+                let filtered = mods.filter(mod => {
+                    const matchesSearch =
+                        mod['display-name'].toLowerCase().includes(searchValue) ||
                         mod.description.toLowerCase().includes(searchValue) ||
                         mod.author.toLowerCase().includes(searchValue);
 
-                    const matchesCategory = selectedCategory === 'All' || mod.category === selectedCategory;
-                    const matchesApi = selectedApi === 'All' || mod.api === selectedApi;
+                    const matchesCategory =
+                        selectedCategory === 'All' || mod.category === selectedCategory;
+
+                    const matchesApi =
+                        selectedApi === 'All' || mod.api === selectedApi;
 
                     return matchesSearch && matchesCategory && matchesApi;
                 });
 
-                renderMods(filteredMods);
+                filtered.sort((a, b) =>
+                    a['display-name'].localeCompare(b['display-name'])
+                );
+
+                renderMods(filtered);
             }
+
+            function debounce(func, delay = 250) {
+                let timeout;
+                return (...args) => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), delay);
+                };
+            }
+
+            searchInput.addEventListener('input', debounce(filterMods));
+            categorySelect.addEventListener('change', filterMods);
+            apiSelect.addEventListener('change', filterMods);
+
+            renderMods(mods);
+
         })
         .catch(error => console.error('Error fetching mods.json:', error));
 });
+
+// fuck you
